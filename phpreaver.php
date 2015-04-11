@@ -47,7 +47,8 @@ class PHPReaver {
 |     ▄█▄  ▀▀▀▀▀▀▀▀▄  ▀▀▀▀▀▀▀ ▄▀ |
 |    █  ▄█▀█▀▀█▀▀▀▀▀▀█▀▀█▀█▀▀█   |
 |    ▀▀▀▀  ▀▀▀        ▀▀▀  ▀▀    |
-*--------- NYAN CAT FTW ---------*';
+*--------- NYAN CAT FTW ---------*
+';
 
 	//leave these variables as they are
 
