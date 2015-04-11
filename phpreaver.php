@@ -30,7 +30,7 @@ class PHPReaver {
 		'sleep_loop'		=> 2700, // Delay in seconds after each loop of all BSSID's and WiFi adapters
 		'sleep_bssid'		=> 5, // Delay in seconds between testing each BSSID
 		'timeout_command'	=> 218, // Timeout in seconds, if reaver has not finished within this time period it will be killed and the next bssid will be tested.
-		'output'			=> 'output-phpreaver.txt' // file to write PHP-Reaver and Reaver output to.
+		'output'			=> 'output-phpreaver.txt' // File to write PHP-Reaver and Reaver output to.
 	);
 
 
@@ -50,7 +50,7 @@ class PHPReaver {
 *--------- NYAN CAT FTW ---------*
 ';
 
-	//leave these variables as they are
+	// Leave these variables as they are
 
 	private $version = '0.1';
 
