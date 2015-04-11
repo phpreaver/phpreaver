@@ -7,4 +7,6 @@ A command line PHP script which uses the reaver WPS pin cracker to test multiple
 * Linux 'timeout' command
 * Linux 'tail' command (optional)
 To install on Ubuntu fire up a terminal and enter
-> sudo apt-get install aircrack-ng reaver timeout
+```
+sudo apt-get install aircrack-ng reaver timeout
+```
