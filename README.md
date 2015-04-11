@@ -44,6 +44,8 @@ class PHPReaver {
 }
 ```
 
+For more configuration options look at the source code.
+
 ##Usage
 
 Before running PHP-Reaver stop any existing monitor interfaces you have started, PHP-Reaver will use airmon-ng to start / stop monitor interfaces.
