@@ -63,3 +63,19 @@ To view the progress of PHP-Reaver, go to another terminal and enter:
 ```
 tail -f output-phpreaver.txt
 ```
+##Misc
+If you are experiencing problems with reaver talking to AP's or wash not showing any AP's when you do a scan this may fix the issue for you:
+
+https://code.google.com/p/reaver-wps/issues/detail?id=217#c20
+
+```
+The reason why reaver & wash not work in Ubuntu 14.04 is the new version of libpcap & libpcap-dev, which is probably have some bug or incompatibility.
+
+You can downgrade to version from Ubuntu 13.10:
+
+wget http://mirrors.kernel.org/ubuntu/pool/main/libp/libpcap/libpcap0.8_1.4.0-2_amd64.deb http://mirrors.kernel.org/ubuntu/pool/main/libp/libpcap/libpcap0.8-dev_1.4.0-2_amd64.deb
+
+sudo dpkg -i libpcap0.8_1.4.0-2_amd64.deb libpcap0.8-dev_1.4.0-2_amd64.deb
+```
+
+Although wash is not required for PHP-Reaver i had more luck with reaver and the AP's i was testing after performing the above fix.
