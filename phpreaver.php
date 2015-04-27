@@ -23,14 +23,15 @@ class PHPReaver {
 		'timeout'				=> 30, // -t, --timeout=<seconds> Set the receive timeout period
 		'max_attempts'			=> 1, // -g, --max-attempts=<num> Quit after num pin attempts
 		'lock_delay' 			=> 218, // -l, --lock-delay=<seconds> Set the time to wait if the AP locks WPS pin attempts
-		'additional_arguments' 	=> '-N -T 5' // Any additional arguments you want to pass to reaver
+		'additional_arguments' 	=> '-N -T 30' // Any additional arguments you want to pass to reaver
 	);
 
 	private $config = array(
-		'sleep_loop'		=> 2700, // Delay in seconds after each loop of all BSSID's and WiFi adapters
+		'sleep_loop'		=> 1800, // Delay in seconds after each loop of all BSSID's and WiFi adapters
 		'sleep_bssid'		=> 5, // Delay in seconds between testing each BSSID
 		'timeout_command'	=> 218, // Timeout in seconds, if reaver has not finished within this time period it will be killed and the next bssid will be tested.
-		'output'			=> 'output-phpreaver.txt' // File to write PHP-Reaver and Reaver output to.
+		'output'			=> 'output-phpreaver.txt', // File to write PHP-Reaver and Reaver output to.
+		'filter_stats'		=> true //only show the bssid's specified above when showing the progress stats. Setting this to false will show all bssid's in the reaver.db
 	);
 
 
@@ -52,7 +53,7 @@ class PHPReaver {
 
 	// Leave these variables as they are
 
-	private $version = '0.1';
+	private $version = '0.2';
 
 	private $_log_fh = null;
 
@@ -60,7 +61,23 @@ class PHPReaver {
 
 	private $_stats = array();
 
+	private $_start_time = 0;
+
+	private $_loop_start_time = 0;
+
+	private $_last_loop_duration = 0;
+
+	private $_loop_durations = array();
+
+	private $_bssid_count = 0;
+
+	private $_loop_count = 0;
+
 	function __construct() {
+
+		$this->_start_time = time();
+
+		foreach( $this->bssids as $iface => $bssids ) $this->_bssid_count += count( $bssids );
 
 		$this->_log_fh = fopen( $this->config['output'], 'a' ) or $this->quit( 'Can\'t open output file' );
 
@@ -70,11 +87,17 @@ class PHPReaver {
 
 		$this->log( 'Starting PHP-Reaver v' . $this->version . ' at ' . $this->time() );
 
+		$this->log_stats();
+
 		while( 1 ) $this->main_loop();
 		
 	}
 
 	private function main_loop() {
+
+		$this->_loop_count++;
+
+		$this->_loop_start_time = time();//$this->time();
 
 		$this->log( 'Loop started at ' . $this->time() );
 
@@ -96,13 +119,17 @@ class PHPReaver {
 
 		}
 
+		$this->_last_loop_duration = time() - $this->_loop_start_time;
+
+		$this->_loop_durations[] = $this->_last_loop_duration;
+
 		$this->log( 'Loop finished at ' . $this->time() );
 
 		$this->log_stats();
 
 		if( $this->config['sleep_loop'] > 0 ) {
 
-			$this->log( 'Sleeping for a while...' );
+			$this->log( 'Sleeping for ' . $this->duration( $this->config['sleep_loop'] ) );
 			sleep( $this->config['sleep_loop'] );
 
 		}
@@ -126,7 +153,7 @@ class PHPReaver {
 
 		if( $this->config['sleep_bssid'] > 0 ) {
 
-			$this->log( 'Sleeping for a moment...' );
+			$this->log( 'Sleeping for a ' . $this->duration( $this->config['sleep_bssid'] ) );
 			sleep( $this->config['sleep_bssid'] );
 
 		}
@@ -134,8 +161,6 @@ class PHPReaver {
 	}
 
 	private function restart_interface( $iface ) {
-
-		$this->log( 'Restarting interface ' . $iface );
 
 		if( isset( $this->_ifaces[ $iface ] ) && $this->_ifaces[ $iface ] != '' ) {
 
@@ -202,12 +227,16 @@ class PHPReaver {
 
 	private function log_stats() {
 
-		$this->log( 'Progress Stats' );
-		$this->log( '==============' );
+		$this->log();
+
+		$this->log( 'Reaver Stats' );
+		$this->log( '============' );
+
+		$this->log();
 
 		$db = new SQLite3( $this->reaver['path_database'] );
 
-		$this->log( $this->pad( 'essid' ) . $this->pad( 'bssid', 20 ) . $this->pad( 'attempts', 9 ) . $this->pad( 'key', 1 ) );
+		$this->log( $this->pad( 'essid' ) . $this->pad( 'bssid', 20 ) . $this->pad( 'attempts', 24 ) . $this->pad( 'key', 1 ) );
 
 		$results = $db->query( 'SELECT * FROM history ORDER BY attempts DESC' );
 
@@ -215,16 +244,73 @@ class PHPReaver {
 
 			$attempts = $row['attempts'];
 
-			if( !isset( $this->_stats[ $row['bssid'] ] ) ) {
-				$this->_stats[ $row['bssid'] ] = $attempts;
+			$show = false;
+
+			if( $this->config[ 'filter_stats' ] === true ) {
+
+				foreach( $this->bssids as $iface => $bssids )
+					if( in_array( $row[ 'bssid' ], $bssids ) )
+						if( $show = true ) break;
+
 			} else {
-				$diff = $attempts - $this->_stats[ $row['bssid'] ];
-				if($diff > 0) $attempts .= ' ( +'.$diff.' )';
+
+				$show = true;
+
 			}
 
-			$this->log( $this->pad( $row['essid'] ) . $this->pad( $row['bssid'], 20 ) . $this->pad( $attempts, 15 ) . $this->pad( $row['key'], 1 ) );
+			if( $show === true ) {
+
+				if( !isset( $this->_stats[ $row[ 'bssid' ] ] ) ) {
+
+					$this->_stats[ $row[ 'bssid' ] ] = $attempts;
+
+					$attempts = $this->pad( $attempts, 17 );
+
+				} else {
+
+					$diff = $attempts - $this->_stats[ $row[ 'bssid' ] ];
+					if($diff > 0) $attempts = $this->pad( $attempts, 6) . $this->pad( '( +' . $diff . ' )', 11 ); //11
+					else $attempts = $this->pad( $attempts, 17 );
+
+				}
+
+				if( $row['attempts'] > 0 ) 
+					$attempts .= $this->pad( $this->percent( $row['attempts'], 11000 ), 4 );
+
+				$this->log( $this->pad( $row['essid'] ) . $this->pad( $row['bssid'], 20 ) . $this->pad( $attempts, 24 ) . $this->pad( $row['key'], 1 ) );
+
+			}
+
 
 		}
+
+		$this->log();
+
+		$this->log( 'PHP-Reaver Stats' );
+		$this->log( '================' );
+
+		$this->log();
+
+		$this->log( 'BSSIDs: ' . $this->_bssid_count );
+		$this->log( 'Started: ' . $this->time() );
+
+		if( $this->_loop_count > 0 ) {
+
+			$avg = 0;
+
+			foreach($this->_loop_durations as $time )
+				$avg += $time;
+
+			$avg = $avg / count( $this->_loop_durations );
+
+			$this->log( 'Running for: ' . $this->duration( time() - $this->_start_time ) );
+			$this->log( 'Loops: ' . $this->_loop_count );
+			$this->log( 'Last loop took: ' . $this->duration( $this->_last_loop_duration ) );
+			$this->log( 'Average loop time: ' . $this->duration( $avg ) );
+
+		}
+
+		$this->log();
 
 	}
 
@@ -234,16 +320,16 @@ class PHPReaver {
 
 	}
 
-	private function quit( $string ) {
+	private function quit( $string = '' ) {
 
 		$this->log( $string . ', Quitting...' );
 		die( $string . ', Quitting...' );
 
 	}
 
-	private function log($string) {
+	private function log( $string = '' ) {
 
-		fwrite( $this->_log_fh, $string . "\n" );
+		fwrite( $this->_log_fh, '[#] ' . $string . "\n" );
 
 	}
 
@@ -254,6 +340,46 @@ class PHPReaver {
 		if( $extra > 0 ) for( $i=1; $i<=$extra; $i++ ) $string .= ' ';
 
 		return $string;
+
+	}
+
+	private function duration( $duration = 0 ) {
+
+	    $second = 1;
+		$minute = 60*$second;
+		$hour   = 60*$minute;
+		$day    = 24*$hour;
+
+		$days    = floor($duration/$day);
+		$hours   = floor(($duration%$day)/$hour);
+		$minutes = floor((($duration%$day)%$hour)/$minute);
+		$seconds = floor(((($duration%$day)%$hour)%$minute)/$second);
+		
+
+	    $string = '';
+
+	    if( (int) $days > 0 )
+	    	$string .= (string) $days . ' days';
+
+	    if( (int) $hours > 0 )
+	    	$string .= ( $string != '' ? ', ':' ') . (string)$hours . ' hours';
+
+	    if( (int) $minutes > 0 )
+	    	$string .= ( $string != '' ? ', ':' ') . (string)$minutes . ' minutes';
+
+	    if( (int) $seconds > 0 )
+	    	$string .= ( $string != '' ? ', ':' ') . (string)$seconds . ' seconds';
+
+	    if( $string == '' )
+	    	$string = 'N/A';
+	 
+	    return trim($string);
+
+	}
+
+	private function percent( $small = 1, $large = 1 ) {
+
+		return (string) round( $small / $large * 100, 2) . '%';
 
 	}
 
